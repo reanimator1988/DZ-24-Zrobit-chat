@@ -1,43 +1,54 @@
 "use strict";
 
-window.addEventListener('error', (event) => {
-    console.log('Oooops', event)
-})
 
+document.addEventListener('DOMContentLoaded', () => {
+    const ws = new WebSocket('ws://localhost:9998');
 
-const CURRENT_LI_KEY = 'currentLi';
-const allLiElements = [...document.querySelectorAll('.lesson-plan li')];
-const currentLiIndex = localStorage.getItem(CURRENT_LI_KEY);
-if (currentLiIndex) {
-    const elementToHighlight = allLiElements(currentLiIndex);
-    setAsActive(elementToHighlight);
-}
+    const messageInput = document.querySelector('.message');
+    const nameInput = document.querySelector('.name');
+    const sendButton = document.querySelector('.btn-send');
+    const joinButton = document.querySelector('.btn-join');
+    const nameContainer = document.getElementById('nameContainer');
+    const chatContainer = document.getElementById('chatContainer');
+    const messageContainer = document.getElementById('messageContainer');
 
-document.querySelector('.lesson-plan').addEventListener('click', e => {
-    if (e.target.nodeName !== 'LI') {
-        return;
-    }
-})
+    let userName = '';
 
+    ws.onmessage = receivedMessageEvent => {
+        try {
+            const messageData = JSON.parse(receivedMessageEvent.data);
+            if (!messageData.systemMessage) {
+                const name = messageData.name;
+                const message = messageData.message;
+                const time = new Date(messageData.time).toLocaleTimeString();
 
-
-const ws = new WebSocket('ws://localhost:9999')
-
-ws.onmessage = messageEvent => {
-    console.log('Received from server: ', messageEvent.data)
-}
-
-ws.onopen = () => {
-    document.querySelector('.btn-send').onclick = () => {
-        const message = document.querySelector('.message').value.trim()
-        if (message) {
-            ws.send(message)
+                const newMessageElement = document.createElement('div');
+                const messageContent = document.createElement('span');
+                messageContent.textContent = `(${time}) ${name}: ${message}`;
+                newMessageElement.appendChild(messageContent);
+                messageContainer.appendChild(newMessageElement);
+            }
+        } catch (error) {
+            console.error('Error parsing message:', error);
+            console.log('Received data:', receivedMessageEvent.data);
         }
-    }
-} 
+    };
 
+    sendButton.addEventListener('click', () => {
+        const message = messageInput.value.trim();
 
+        if (message && userName) {
+            ws.send(JSON.stringify({ name: userName, message, time: new Date().toISOString() }));
+            messageInput.value = '';
+        }
+    });
 
-
-
-
+    joinButton.addEventListener('click', () => {
+        const name = nameInput.value.trim();
+        if (name) {
+            userName = name;
+            nameContainer.style.display = 'none';
+            chatContainer.style.display = 'block';
+        }
+    });
+});

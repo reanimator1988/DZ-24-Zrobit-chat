@@ -1,16 +1,35 @@
-import { WebSocketServer } from "ws";
+import { WebSocketServer, WebSocket } from "ws";
 
-const wss = new WebSocketServer ({port: 9999});
+const wss = new WebSocketServer({ port: 9998 });
 
 wss.on('connection', client => {
     console.log('---- NEW CLIENT CONNECTED');
 
+    let userName = '';
+
     client.on('message', data => {
-        console.log('GOT MESSAGE', data.toString())
-    })
+        try {
+            const parsedData = JSON.parse(data);
 
-    client.on('close', () => {
-        console.log('----CLIENT DISCONNECT')
-    })
-})
+            if (parsedData.name && userName !== parsedData.name) {
+                userName = parsedData.name;
+                const userJoinedMessage = { systemMessage: `User ${userName} has joined the chat.` };
+                broadcastMessage(userJoinedMessage);
+            }
 
+            if (client.readyState === WebSocket.OPEN) {
+                broadcastMessage(parsedData);
+            }
+        } catch (error) {
+            console.error('Error processing message:', error);
+        }
+    });
+
+    function broadcastMessage(message) {
+        wss.clients.forEach(otherClient => {
+            if (otherClient.readyState === WebSocket.OPEN) {
+                otherClient.send(JSON.stringify(message));
+            }
+        });
+    }
+});
